@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>幸运抽奖</title>
+<style>
+  :root{
+    --bg:#f4f4f1;
+    --panel:#ffffff;
+    --line:#e2e2dd;
+    --line-strong:#cfcfc8;
+    --ink:#151514;
+    --muted:#8c8c86;
+    --soft:#b9b9b2;
+    --hit:#f1f1ec;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB","Source Han Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  .app{
+    height:100vh;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 360px;
+    gap:0;
+  }
+
+  /* ---------- 左：抽奖区 ---------- */
+  .left{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    padding:32px 40px 28px;
+    border-right:1px solid var(--line);
+  }
+  .head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:20px;
+    flex-wrap:wrap;
+    padding-bottom:18px;
+    border-bottom:1px solid var(--line);
+  }
+  .head h1{
+    margin:0;
+    font-size:22px;
+    font-weight:600;
+    letter-spacing:.14em;
+  }
+  .head .meta{
+    font-size:13px;
+    color:var(--muted);
+    letter-spacing:.06em;
+    font-variant-numeric:tabular-nums;
+  }
+  .head .meta b{color:var(--ink);font-weight:600;}
+
+  .draw{
+    flex:1 1 auto;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:22px;
+    padding:24px 0;
+  }
+  .label{
+    font-size:12px;
+    letter-spacing:.34em;
+    color:var(--soft);
+    min-height:18px;
+  }
+  .result{
+    font-size:clamp(48px,9.4vw,132px);
+    font-weight:700;
+    letter-spacing:.06em;
+    line-height:1.1;
+    max-width:100%;
+    text-align:center;
+    white-space:nowrap;
+    overflow:hidden;
+    color:var(--ink);
+    transition:color .18s;
+  }
+  .result.rolling{color:var(--soft);}
+  .result.empty{color:var(--soft);font-weight:600;}
+  .sub{
+    font-size:14px;
+    color:var(--muted);
+    letter-spacing:.08em;
+    min-height:22px;
+    font-variant-numeric:tabular-nums;
+  }
+  .sub b{color:var(--ink);font-weight:600;}
+
+  .actions{display:flex;justify-content:center;padding-bottom:4px;}
+  .btn{
+    appearance:none;
+    border:1px solid var(--ink);
+    background:var(--ink);
+    color:#fff;
+    font-family:inherit;
+    font-size:16px;
+    font-weight:600;
+    letter-spacing:.3em;
+    text-indent:.3em;
+    height:58px;
+    padding:0 44px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:background .15s,border-color .15s,color .15s;
+  }
+  .btn:hover{background:#2e2e2b;border-color:#2e2e2b;}
+  .btn:active{background:#000;border-color:#000;}
+  .btn:disabled{cursor:default;background:#c9c9c2;border-color:#c9c9c2;color:#fff;}
+  .hint{
+    font-size:12px;
+    color:var(--soft);
+    letter-spacing:.1em;
+    text-align:center;
+    min-height:18px;
+  }
+
+  /* ---------- 右：统计 ---------- */
+  .side{
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+    background:var(--panel);
+  }
+  .side header{
+    padding:30px 24px 16px;
+    border-bottom:1px solid var(--line);
+  }
+  .side header h2{
+    margin:0 0 14px;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:.2em;
+  }
+  .sums{
+    display:flex;
+    gap:28px;
+  }
+  .sums div{display:flex;flex-direction:column;gap:4px;}
+  .sums small{font-size:11px;color:var(--muted);letter-spacing:.12em;}
+  .sums span{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;}
+
+  .list{
+    flex:1 1 auto;
+    overflow:auto;
+    padding:8px 12px 12px;
+  }
+  .list::-webkit-scrollbar{width:8px;}
+  .list::-webkit-scrollbar-thumb{background:#dcdcd6;border-radius:8px;}
+  .row{
+    display:grid;
+    grid-template-columns:26px 1fr 42px;
+    align-items:center;
+    gap:10px;
+    row-gap:5px;
+    padding:9px 10px;
+    border-radius:6px;
+    transition:background .15s;
+  }
+  .row .no{
+    font-size:11px;
+    color:var(--soft);
+    font-variant-numeric:tabular-nums;
+    text-align:right;
+  }
+  .row .nm{
+    font-size:14px;
+    color:var(--ink);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .row .bar{
+    grid-column:2 / 3;
+    grid-row:2;
+    height:2px;
+    border-radius:2px;
+    background:#ececE6;
+    overflow:hidden;
+  }
+  .row .bar i{
+    display:block;
+    height:100%;
+    width:0;
+    background:var(--ink);
+    border-radius:3px;
+    transition:width .35s ease;
+  }
+  .row .n{
+    font-size:13px;
+    font-weight:600;
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+    color:var(--ink);
+  }
+  .row.zero .nm,.row.zero .n{color:var(--soft);font-weight:400;}
+  .row.hit{background:var(--hit);}
+  .row.hit .nm{font-weight:600;}
+
+  .side footer{
+    border-top:1px solid var(--line);
+    padding:14px 20px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .side footer .note{font-size:11px;color:var(--soft);letter-spacing:.04em;}
+  .btn-plain{
+    appearance:none;
+    border:1px solid var(--line-strong);
+    background:transparent;
+    color:var(--muted);
+    font-family:inherit;
+    font-size:12px;
+    letter-spacing:.08em;
+    padding:7px 12px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:.15s;
+  }
+  .btn-plain:hover{color:var(--ink);border-color:var(--ink);}
+
+  @media (max-width:900px){
+    body{overflow:auto;}
+    .app{height:auto;min-height:100vh;grid-template-columns:1fr;}
+    .left{padding:20px;border-right:0;border-bottom:1px solid var(--line);}
+    .draw{padding:36px 0 28px;gap:18px;}
+    .side{border-top:0;max-height:none;}
+    .side header{padding:20px 20px 14px;}
+    .list{max-height:none;overflow:visible;}
+  }
+  @media (max-width:520px){
+    .head h1{font-size:18px;}
+    .head .meta{font-size:12px;}
+    .btn{width:100%;height:54px;}
+    .actions{width:100%;}
+    .result{font-size:clamp(40px,13vw,72px);}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="left">
+    <div class="head">
+      <h1>幸运抽奖</h1>
+      <div class="meta">名单 52 人 · 累计抽奖 <b id="draws">0</b> 次 · 已有 <b id="hitPeople">0</b> 人被抽中</div>
+    </div>
+
+    <div class="draw">
+      <div class="label" id="label">点击按钮开始</div>
+      <div class="result empty" id="result">准备就绪</div>
+      <div class="sub" id="sub"></div>
+      <div class="actions">
+        <button class="btn" id="drawBtn">抽 奖</button>
+      </div>
+      <div class="hint" id="hint">按空格键也可以抽奖 · 每人可被重复抽中</div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <header>
+      <h2>中奖次数统计</h2>
+      <div class="sums">
+        <div><small>抽奖总次数</small><span id="sumTotal">0</span></div>
+        <div><small>被抽中人数</small><span id="sumPeople">0</span></div>
+        <div><small>最高次数</small><span id="sumMax">0</span></div>
+      </div>
+    </header>
+    <div class="list" id="list"></div>
+    <footer>
+      <span class="note">按次数由高到低排序</span>
+      <button class="btn-plain" id="resetBtn">清空统计</button>
+    </footer>
+  </aside>
+</div>
+
+<script>
+/* ===== 名单（来自 名单.xls，Sheet1，共 52 人） ===== */
+const NAMES = [
+  "艾安悦","安朝宇","白朗","岑民浩","曾昭贤","陈婷婷","方钰涵","何承珊",
+  "何美","何其克","何煜婷","胡哲","李妃玉而","李家成","李家治","林依涵",
+  "刘澜添","陆贝贝","陆恩水","陆泓瑞","陆家辉","陆诗雨","陆秀婷","陆玉树",
+  "陆玉轩","骆光颖","蒙秉浩","蒙金枝","莫忠恒","莫梓轩","潘婷娜","万芃炜",
+  "王梦","王贤熠","王雨韵","老师","韦婷涵","韦怡霏","韦语桐","韦子涵",
+  "韦宗航","吴昌宇","吴德瑶","杨景晖","杨凌馨","杨兴耀","杨忠宁","杨忠翔",
+  "张立萱","张艺可","祝雨婷","莫淳诒"
+];
+
+const STORE_KEY = "lucky-draw-count-v1";
+
+/* ===== 状态 ===== */
+const S = {
+  counts: {},        // 姓名 -> 次数
+  draws: 0,          // 总抽奖次数
+  last: null,        // 最近抽中的人
+  rolling: false,
+  lastRoundCount: 0  // 此人本次抽中时是第几次
+};
+
+/* ===== DOM ===== */
+const $ = id => document.getElementById(id);
+const resultEl = $("result");
+const labelEl  = $("label");
+const subEl    = $("sub");
+const hintEl   = $("hint");
+const btn      = $("drawBtn");
+const listEl   = $("list");
+const drawsEl  = $("draws");
+const hitEl    = $("hitPeople");
+const sumTotal = $("sumTotal");
+const sumPeople= $("sumPeople");
+const sumMax   = $("sumMax");
+const resetBtn = $("resetBtn");
+
+/* ===== 存储 ===== */
+function save(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify({ counts: S.counts, draws: S.draws, last: S.last }));
+  }catch(e){}
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (d && typeof d.counts === "object" && d.counts){
+      Object.keys(d.counts).forEach(k => {
+        if (NAMES.includes(k)){
+          const v = Number(d.counts[k]);
+          if (isFinite(v) && v > 0) S.counts[k] = Math.floor(v);
+        }
+      });
+    }
+    if (d.counts && d.counts["韦楚涵"]){
+      S.counts["老师"] = (S.counts["老师"] || 0) + Math.floor(Number(d.counts["韦楚涵"]) || 0);
+      S.counts["韦楚涵"] = 0;
+      delete S.counts["韦楚涵"];
+    }
+    if (d && d.last === "韦楚涵") d.last = "老师";
+    S.draws = Number(d && d.draws) || 0;
+    const total = Object.values(S.counts).reduce((a, b) => a + b, 0);
+    if (S.draws < total) S.draws = total;
+    if (d && typeof d.last === "string" && NAMES.includes(d.last)) S.last = d.last;
+  }catch(e){}
+}
+
+/* ===== 渲染 ===== */
+function totalCounts(){
+  return Object.values(S.counts).reduce((a, b) => a + b, 0);
+}
+function hitCount(){
+  return Object.keys(S.counts).filter(k => S.counts[k] > 0).length;
+}
+
+function renderHead(){
+  const total = S.draws;
+  drawsEl.textContent = total;
+  hitEl.textContent = hitCount();
+  sumTotal.textContent = total;
+  sumPeople.textContent = hitCount();
+  sumMax.textContent = Object.values(S.counts).length ? Math.max(...Object.values(S.counts)) : 0;
+}
+
+let rowMap = new Map();
+function buildList(){
+  listEl.innerHTML = "";
+  rowMap = new Map();
+  NAMES.forEach(name => {
+    const row = document.createElement("div");
+    row.className = "row zero";
+    row.dataset.name = name;
+    row.innerHTML =
+      '<div class="no"></div>' +
+      '<div class="nm"></div>' +
+      '<div class="n">0</div>' +
+      '<div class="bar"><i></i></div>';
+    row.querySelector(".nm").textContent = name;
+    listEl.appendChild(row);
+    rowMap.set(name, row);
+  });
+  renderList();
+}
+
+let sortedNames = NAMES.slice();
+function renderList(){
+  const max = Math.max(1, ...NAMES.map(n => S.counts[n] || 0));
+  sortedNames = NAMES.slice().sort((a, b) => {
+    const d = (S.counts[b] || 0) - (S.counts[a] || 0);
+    return d !== 0 ? d : NAMES.indexOf(a) - NAMES.indexOf(b);
+  });
+  const frag = document.createDocumentFragment();
+  sortedNames.forEach((name, i) => {
+    const row = rowMap.get(name);
+    const c = S.counts[name] || 0;
+    row.querySelector(".no").textContent = c > 0 ? i + 1 : "";
+    row.querySelector(".n").textContent = c;
+    row.querySelector(".bar i").style.width = (c ? (c / max) * 100 : 0) + "%";
+    row.classList.toggle("zero", c === 0);
+    row.classList.toggle("hit", name === S.last && c > 0);
+    frag.appendChild(row);
+  });
+  listEl.appendChild(frag);
+}
+
+function render(){
+  renderHead();
+  renderList();
+}
+
+/* ===== 抽奖 ===== */
+const rand = n => Math.floor(Math.random() * n);
+
+function draw(){
+  if (S.rolling) return;
+  S.rolling = true;
+  btn.disabled = true;
+  labelEl.textContent = "抽奖中";
+  hintEl.textContent = " ";
+  resultEl.classList.remove("empty");
+  resultEl.classList.add("rolling");
+  resultEl.textContent = NAMES[rand(NAMES.length)];
+  subEl.textContent = "";
+
+  const winner = NAMES[rand(NAMES.length)];
+  const spin = setInterval(() => {
+    resultEl.textContent = NAMES[rand(NAMES.length)];
+  }, 55);
+
+  // 先快转 800ms，再减速落定
+  const delays = [70, 90, 120, 160, 210, 270];
+  setTimeout(() => {
+    clearInterval(spin);
+    let k = 0;
+    const step = () => {
+      if (k < delays.length){
+        const wait = delays[k++];
+        resultEl.textContent = NAMES[rand(NAMES.length)];
+        setTimeout(step, wait);
+      } else {
+        land(winner);
+      }
+    };
+    step();
+  }, 800);
+}
+
+function land(name){
+  // 记录
+  S.counts[name] = (S.counts[name] || 0) + 1;
+  S.draws += 1;
+  S.last = name;
+  S.lastRoundCount = S.counts[name];
+  save();
+
+  resultEl.classList.remove("rolling");
+  resultEl.textContent = name;
+  fitResult();
+
+  const total = S.draws;
+  labelEl.textContent = "恭喜";
+  subEl.innerHTML = "第 <b>" + total + "</b> 次抽奖 · 该同学累计被抽中 <b>" + S.lastRoundCount + "</b> 次";
+  hintEl.textContent = "按空格键继续抽奖 · 每人可被重复抽中";
+
+  S.rolling = false;
+  btn.disabled = false;
+  render();
+}
+
+function fitResult(){
+  resultEl.style.fontSize = "";
+  const max = resultEl.parentElement.clientWidth - 8;
+  if (max <= 0) return;
+  let size = parseFloat(getComputedStyle(resultEl).fontSize);
+  let guard = 0;
+  while (resultEl.scrollWidth > max && size > 28 && guard++ < 80){
+    size -= 3;
+    resultEl.style.fontSize = size + "px";
+  }
+}
+
+/* ===== 事件 ===== */
+btn.addEventListener("click", draw);
+
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" || e.key === " "){
+    e.preventDefault();
+    draw();
+  }
+});
+
+resetBtn.addEventListener("click", () => {
+  if (!S.draws){ hintEl.textContent = "还没有抽奖记录"; return; }
+  if (!confirm("确定清空全部抽奖次数统计？")) return;
+  S.counts = {};
+  S.draws = 0;
+  S.last = null;
+  save();
+  resultEl.classList.add("empty");
+  resultEl.textContent = "准备就绪";
+  resultEl.style.fontSize = "";
+  labelEl.textContent = "点击按钮开始";
+  subEl.textContent = "";
+  hintEl.textContent = "按空格键也可以抽奖 · 每人可被重复抽中";
+  render();
+});
+
+window.addEventListener("resize", () => {
+  if (S.last) fitResult();
+  else resultEl.style.fontSize = "";
+});
+
+/* ===== 初始化 ===== */
+(function init(){
+  load();
+  buildList();
+  render();
+  if (S.last){
+    resultEl.classList.remove("empty");
+    resultEl.textContent = S.last;
+    fitResult();
+    labelEl.textContent = "上次抽中";
+    subEl.innerHTML = "已累计抽奖 <b>" + S.draws + "</b> 次 · 该同学累计被抽中 <b>" + (S.counts[S.last] || 0) + "</b> 次";
+  }
+})();
+</script>
+</body>
+</html>
